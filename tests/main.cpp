@@ -5,8 +5,7 @@
 #include <chrono>
 #include <iostream>
 #include <condition_variable>
-#include "execlib/execution_engine.hpp"
-#include "execlib/future.hpp"
+#include "execlib.hpp"
 
 
 template <class F> double time_func(F&& func) {
