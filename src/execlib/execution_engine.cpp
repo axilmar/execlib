@@ -229,6 +229,12 @@ namespace execlib {
     }
 
 
+    //Returns the number of threads used to execute tasks.
+    size_t get_thread_count() {
+        return thread_count;
+    }
+
+
     //executes the task
     void execute(task* const t) noexcept {
         //get thread index in round robin fashion

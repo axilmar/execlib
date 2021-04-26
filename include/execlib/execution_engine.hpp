@@ -73,6 +73,13 @@ namespace execlib {
 
 
     /**
+     * Returns the number of threads used to execute tasks.
+     * @return the number of threads used to execute tasks.
+     */
+    size_t get_thread_count();
+
+
+    /**
      * Executes the given task in parallel.
      * The task is added to the queue of one of the worker threads, in round-robin fashion.
      * If the engine is not initialized, behavior is undefined.
@@ -88,7 +95,7 @@ namespace execlib {
      * @param callable task callable task to execute.
      */
     template <class T> void execute(T&& callable) noexcept {
-        execute(new callable_task<T>(std::forward<T>(callable)));
+        execute(static_cast<task *>(new callable_task<T>(std::forward<T>(callable))));
     }
 
 
