@@ -42,7 +42,7 @@ namespace execlib {
 
 
     //constants
-    static constexpr size_t MIN_QUEUE_SIZE_TO_STEAL = 4;
+    static constexpr size_t MIN_QUEUE_SIZE_TO_STEAL = 2;
 
 
     //get task from thread
