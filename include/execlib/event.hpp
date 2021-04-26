@@ -55,7 +55,7 @@ namespace execlib {
 
     private:
         std::mutex m_mutex;
-        bool m_value{ false };
+        bool m_value;
         std::condition_variable m_cond;
     };
 
