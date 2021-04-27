@@ -73,13 +73,16 @@ static void test() {
 }
 
 
-int main() {
+static void performance_test() {
     execlib::initialize();
-
     double d = time_func([&]() { test(); });
     std::cout << d << std::endl;
-
     execlib::cleanup();
+}
+
+
+int main() {
+    //performance_test();
     system("pause");
     return 0;
 }

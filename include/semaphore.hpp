@@ -44,7 +44,8 @@ namespace execlib {
         }
 
         /**
-         * Waits for the value to become 0, then it decrements the value.
+         * Waits for the value to become greater than 0, then it decrements the value.
+         * Use this function to acquire the resource.
          */
         void wait() {
             std::unique_lock lock(m_mutex);
@@ -52,6 +53,22 @@ namespace execlib {
                 m_cond.wait(lock);
             }
             --m_value;
+        }
+
+        /**
+         * Used for acquiring a resource.
+         * Invokes 'wait()'.
+         */
+        void acquire() {
+            wait();
+        }
+
+        /**
+         * Used for releasing a resource.
+         * Invokes 'set_and_notify_one(1)'.
+         */
+        void release() {
+            set_and_notify_one();
         }
 
     private:
