@@ -23,7 +23,7 @@ static std::vector<std::string> prepare_test_data() {
 
     std::vector<std::string> result;
 
-    for (size_t i = 0; i < 500; ++i) {
+    for (size_t i = 0; i < std::thread::hardware_concurrency()*2; ++i) {
         result.emplace_back();
         for (size_t j = 0; j < 8; ++j) {
             result.back().push_back((char)dist(re));
@@ -49,27 +49,31 @@ static void test() {
     const size_t partition_size = test_data.size() / execlib::get_thread_count();
     const size_t partition_count = (test_data.size() + partition_size - 1) / partition_size;
 
-    std::vector<execlib::future<bool>> events(partition_count);
+    //std::vector<execlib::future<bool>> events(partition_count);
+    execlib::counter<int> counter;
 
     for (size_t partition_index = 0; partition_index < partition_count; ++partition_index) {
         const size_t partition_start = partition_index * partition_size;
         const size_t partition_end = partition_index < partition_count - 1 ? partition_start + partition_size : test_data.size();
 
-        int x = 0;
-
-        execlib::execute([partition_test_data = std::vector<std::string>(test_data.begin() + partition_start, test_data.begin() + partition_end), pi = partition_index, &events]() {
+        counter.increment_and_notify_one();
+        execlib::execute([partition_test_data = std::vector<std::string>(test_data.begin() + partition_start, test_data.begin() + partition_end), pi = partition_index/*, &events*/, &counter]() {
             for (size_t index = 0; index < partition_test_data.size(); ++index) {
                 const std::string in_str = partition_test_data[index];
                 std::string out_str(in_str);
                 create_all_combinations(in_str, out_str);
             }
-            events[pi].set_and_notify_one(true);
+            //events[pi].set_and_notify_one(true);
+            counter.decrement_and_notify_one();
         });
     }
 
+    /*
     for (execlib::future<bool>& e : events) {
         e.wait();
     }
+    */
+    counter.wait();
 }
 
 
@@ -82,7 +86,7 @@ static void performance_test() {
 
 
 int main() {
-    //performance_test();
+    performance_test();
     system("pause");
     return 0;
 }
