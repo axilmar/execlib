@@ -179,24 +179,23 @@ namespace execlib {
 
     //initialize with specific number of threads
     void initialize(const size_t tc) {
-        //must have thread_count > 0
-        if (tc == 0) {
-            throw std::invalid_argument("thread_count must not be 0");
-        }
+        static std::once_flag f;
 
-        //check if initialized
-        if (threads) {
-            throw std::logic_error("Execution engine already initialized");
-        }
+        std::call_once(f, [tc]() {
+            //must have thread_count > 0
+            if (tc == 0) {
+                throw std::invalid_argument("thread_count must not be 0");
+            }
 
-        //create the thread objects
-        thread_count = tc;
-        threads = new thread[thread_count];
+            //create the thread objects
+            thread_count = tc;
+            threads = new thread[thread_count];
 
-        //start the threads
-        for (size_t i = 0; i < thread_count; ++i) {
-            threads[i].thread_object = std::thread([i]() { thread_proc(threads[i]); });
-        }
+            //start the threads
+            for (size_t i = 0; i < thread_count; ++i) {
+                threads[i].thread_object = std::thread([i]() { thread_proc(threads[i]); });
+            }
+        });
     }
 
 
@@ -214,35 +213,34 @@ namespace execlib {
 
     //Stops the executing threads and cleans up the eecution engine.
     void cleanup() {
-        //check if initialized
-        if (!threads) {
-            return;
-        }
+        static std::once_flag f;
 
-        //put the stop flag and notify the threads
-        for (size_t i = 0; i < thread_count; ++i) {
-            {
-                std::lock_guard lock(threads[i].mutex);
-                threads[i].stop = true;
+        std::call_once(f, []() {
+            //put the stop flag and notify the threads
+            for (size_t i = 0; i < thread_count; ++i) {
+                {
+                    std::lock_guard lock(threads[i].mutex);
+                    threads[i].stop = true;
+                }
+                threads[i].wait_cond.notify_one();
             }
-            threads[i].wait_cond.notify_one();
-        }
 
-        //wait for the threads to terminate
-        for (size_t i = 0; i < thread_count; ++i) {
-            threads[i].thread_object.join();
-        }
-
-        //delete any pending tasks
-        for (size_t i = 0; i < thread_count; ++i) {
-            for (task* tsk : threads[i].queue) {
-                delete tsk;
+            //wait for the threads to terminate
+            for (size_t i = 0; i < thread_count; ++i) {
+                threads[i].thread_object.join();
             }
-        }
 
-        //delete the threads
-        delete[] threads;
-        threads = nullptr;
+            //delete any pending tasks
+            for (size_t i = 0; i < thread_count; ++i) {
+                for (task* tsk : threads[i].queue) {
+                    delete tsk;
+                }
+            }
+
+            //delete the threads
+            delete[] threads;
+            threads = nullptr;
+        });
     }
 
 
