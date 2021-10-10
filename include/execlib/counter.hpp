@@ -24,6 +24,22 @@ namespace execlib {
 
         /**
          * Atomically increments the counter.
+         */
+        void increment() {
+            std::lock_guard lock(m_mutex);
+            ++m_value;
+        }
+
+        /**
+         * Atomically decrements the counter.
+         */
+        void decrement() {
+            std::lock_guard lock(m_mutex);
+            --m_value;
+        }
+
+        /**
+         * Atomically increments the counter.
          * It notifies one thread.
          */
         void increment_and_notify_one() {
