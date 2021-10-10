@@ -184,6 +184,11 @@ namespace execlib {
             throw std::invalid_argument("thread_count must not be 0");
         }
 
+        //check if initialized
+        if (threads) {
+            throw std::logic_error("Execution engine already initialized");
+        }
+
         //create the thread objects
         thread_count = tc;
         threads = new thread[thread_count];
@@ -209,6 +214,11 @@ namespace execlib {
 
     //Stops the executing threads and cleans up the eecution engine.
     void cleanup() {
+        //check if initialized
+        if (!threads) {
+            return;
+        }
+
         //put the stop flag and notify the threads
         for (size_t i = 0; i < thread_count; ++i) {
             {
@@ -232,6 +242,7 @@ namespace execlib {
 
         //delete the threads
         delete[] threads;
+        threads = nullptr;
     }
 
 
