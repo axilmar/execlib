@@ -38,7 +38,7 @@ namespace execlib {
 
     //threads
     static size_t thread_count{ 0 };
-    static thread* threads;
+    static thread* threads{ nullptr };
 
 
     //constants
@@ -198,6 +198,12 @@ namespace execlib {
     //initialize with hardware number of threads
     void initialize() {
         initialize(std::thread::hardware_concurrency());
+    }
+
+
+    //Returns true if the execution engine is initialized.
+    bool is_initialized() {
+        return threads;
     }
 
 

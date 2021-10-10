@@ -65,6 +65,13 @@ namespace execlib {
 
 
     /**
+     * Returns true if the execution engine is initialized.
+     * @return true if the execution engine is initialized, false otherwise.
+     */
+    bool is_initialized();
+
+
+    /**
      * Stops the executing threads and cleans up the eecution engine.
      * The engine can then be re-initialized.
      * If the engine is not initialized, behavior is undefined.
