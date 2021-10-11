@@ -2,152 +2,65 @@
 
 C++17 concurrent execution library.
 
-It provides the following features:
-
-* a background thread pool that can execute jobs (with job stealing for increased throughput).
-* a simple `execute()` function that allows any task to be executed by a background worker thread.
-* an `event` class which can be used for thread coordination.
-* a `future<T>` class which can be used to deliver a result from one thread to another (if using the standard future+promise classes are not preferred).
-
-## API
-### Initialization/cleanup
-
-Initializing and cleaning up the API can be done like this:
+## Example
 
 ```cpp
+#include <iostream>
 #include "execlib.hpp"
 
+execlib::executor executor;
+
+int factorial(int n) {
+    return n > 0 ? n * factorial(n - 1) : 1;
+}
+
+void task(int i) {
+    executor.execute([i]() {
+        int r = factorial(i);
+        std::cout << "factorial of " << i << " = " << r << std::endl;
+    });
+}
+
 int main() {
-	//initialize
-	execlib::initialize();
-	
-	//your code goes here
-	
-	//cleanup
-	execlib::cleanup();
-	return 0;
+    for(int i = 0; i < 100; ++i) {
+        task(i);
+    }
 }
 ```
 
-The number of threads can be specified as a parameter to the `initialize()` function. By default, the `initialize()` function creates as many threads as they are reported by `std::thread::hardware_concurrency()`.
+## Classes
 
-### Execution
+### executor
 
-Executing a task requires writing an anonymous function and then passing it to the `execute()` function. Example:
+Allows the execution of tasks in a worker thread; the number of worker threads are defined in the constructor.
 
-```cpp
-void hello_world() {
-	execlib::execute([](){ std::cout << "hello world!\n"; });
-}
-```
+### future
 
-### Notifications between threads
+Allows the passing of a result to a function; provided as a simpler alternative to std::future/std::promise.
 
-Threads can be notified that other threads have some results available via the following ways:
+### event
 
-1. using `std::future<T>`, `std::promise<T>`. This is the standard way of communicating results.
-2. using `execlib::event` or `execlib::future<T>`. These classes are very simple, simpler than what the standard gives, but also less capable (for example, they cannot curry exceptions).
+Allows the raising of an event from one thread to another; provided as a wrapper around a mutex, a wait condition and a boolean flag.
 
-#### The `event` class
+### counter
 
-Here is an example of how to use the `event` class:
+Allows blocking on a variable until that variable reaches a specific value; useful for counting tasks.
 
-```cpp
-void some_long_task() {
-    execlib::event e;
-    execlib::execute([](){
-    	some_long_computation();
-    	e.set_and_notify_one();
-    });
-    e.wait();
-}
-```
+## Algorithms
 
-#### The `future<T>` class
+### The Scheduler
 
-Here is an example of how to use the `future<T>` class:
+The thread scheduler is round robin: each new job is added to the next thread's queue, rolling back to the first thread if the last thread is reached.
 
-```cpp
-void some_long_task() {
-    execlib::future<int> f;
-    execlib::execute([](){
-    	some_long_computation();
-    	f.set_and_notify_one(1);
-    });
-    int r = f.wait();
-}
-```
+### Job Stealing
 
-### The best way to take advantage of this API...
+In order to avoid thread starving, threads steal jobs from their neighbors, if they don't have any jobs to execute.
 
-In order to fully exploit this API, computations shall be broken down to individual steps that can be executed in parallel.
+### Memory Allocation
 
-Computations that yield a result and then perform other computations shall be executed in nested `execute()` calls. In this way, the internal work threads can be kept busy and actually increase the aplication's performance.
+Each thread has its own memory pool to allocate memory for jobs.
 
-For example, let's say we have a function named 'function1' which returns an integer, which must be fed to another function named 'function2'. The best way to achieve this is the following:
+### Lock Contention
 
-```cpp
-void do_actions() {
-	execlib::execute([](){
-		int result = function1();
-		execlib::execute([result](){ 
-			function2(result); 
-		});
-	});
-}
-```
-In this way, a natural graph of operations is created dynamically, and each part of the graph is naturally processed by multiple threads.
+Each thread has its own mutex to protect its resources. There is no lock contention between threads, except when deallocating memory of stolen jobs.
 
-**NOTE: Using the `event` or `future<T>` classes shall be done with caution, because they might block the worker threads and decrease performance.**
-
-## The algorithms
-
-### The dispatch algorithm
-
-Tasks are dispatched in round-robin fashion to all the background worker threads. Each thread has its own task queue.
-
-### The work-stealing algorithm
-
-Internally, each worker thread waits for jobs to appear in its own queue.
-
-However, the queue may become empty and the thread might no longer have something to do.
-
-Instead of waiting, the thread with an empty queue goes looking at the queues of other threads, starting from its neighbour threads. If it finds some jobs, then it takes those from these other queues and puts them in its own queue.
-
-A thread takes half of the jobs of the first neighbour thread found to contain jobs.
-
-In this way, threads are kept busy and they are only waiting if no other thread has anything to do.
-
-### Lock contention
-
-Each thread has a mutex that protects its queue.
-
-Putting a task to this queue requires this mutex to be locked.
-
-Getting a task from this queue requires this mutex to be locked.
-
-Stealing items from a thread's queue requires the two mutexes of the source and destination threads to be locked.
-
-In this way, lock contention is kept minimal.
-
-## Frequently Asked Questions
-
-### Can the background thread for a task be chosen?
-
-No. 
-
-The thread that will execute a task is random and depends on the load distribution. It would be meanigless to provide a task execution API and also provide the functionality of posting a task to the same thread, because that would defeat the purpose of parallelizing the task execution.
-
-This deliberate design decision makes programming APIs harder, because all APIs shall be well-behaved in a threaded context.
-
-It's an unvoidable tradeoff in the age of multiple CPU cores, in my humble opinion, and worth having, for computation-heavy applications. 
-
-### Can the memory management for a task be customized?
-
-Yes.  
-  
-The base class for all tasks is the class `task`. Implementing a sub-class of this class allows the customization of all the aspects of the class, including the way it is allocated/deleted.
-
-The default memory management is global operator new/delete for tasks.
-
-In most platforms, the default memory management might be more than enough because usually it is heavily optimized.
