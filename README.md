@@ -34,14 +34,6 @@ int main() {
 
 Allows the execution of tasks in a worker thread; the number of worker threads are defined in the constructor.
 
-### future
-
-Allows the passing of a result to a function; provided as a simpler alternative to std::future/std::promise.
-
-### event
-
-Allows the raising of an event from one thread to another; provided as a wrapper around a mutex, a wait condition and a boolean flag.
-
 ### counter
 
 Allows blocking on a variable until that variable reaches a specific value; useful for counting tasks.

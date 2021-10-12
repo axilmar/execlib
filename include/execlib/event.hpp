@@ -2,6 +2,7 @@
 #define EXECLIB_EVENT_HPP
 
 
+#include <atomic>
 #include <mutex>
 #include <condition_variable>
 
@@ -26,9 +27,7 @@ namespace execlib {
          * Sets the value to true and notifies one thread.
          */
         void set_and_notify_one() {
-            m_mutex.lock();
-            m_value = true;
-            m_mutex.unlock();
+            m_value.store(true, std::memory_order_release);
             m_cond.notify_one();
         }
 
@@ -36,9 +35,7 @@ namespace execlib {
          * Sets the value to true and notifies all threads.
          */
         void set_and_notify_all() {
-            m_mutex.lock();
-            m_value = true;
-            m_mutex.unlock();
+            m_value.store(true, std::memory_order_release);
             m_cond.notify_all();
         }
 
@@ -46,16 +43,16 @@ namespace execlib {
          * Waits for the value to become true, then it sets the value to false.
          */
         void wait() {
-            std::unique_lock lock(m_mutex);
-            while (!m_value) {
+            while (!m_value.load(std::memory_order_acquire)) {
+                std::unique_lock lock(m_mutex);
                 m_cond.wait(lock);
             }
-            m_value = false;
+            m_value.store(false, std::memory_order_release);
         }
 
     private:
+        std::atomic<bool> m_value;
         std::mutex m_mutex;
-        bool m_value;
         std::condition_variable m_cond;
     };
 
