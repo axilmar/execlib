@@ -26,7 +26,7 @@ static std::vector<std::string> prepare_test_data() {
 
     std::vector<std::string> result;
 
-    for (size_t i = 0; i < std::thread::hardware_concurrency()*40; ++i) {
+    for (size_t i = 0; i < std::thread::hardware_concurrency()*100; ++i) {
         result.emplace_back();
         for (size_t j = 0; j < 8; ++j) {
             result.back().push_back((char)dist(re));

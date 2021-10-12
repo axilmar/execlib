@@ -2,6 +2,7 @@
 #define EXECLIB_COUNTER_HPP
 
 
+#include <atomic>
 #include <mutex>
 #include <condition_variable>
 
@@ -10,68 +11,135 @@ namespace execlib {
 
 
     /**
-     * A synchronized counter class.
-     * It can be used to implement waiting for tasks to finish.
+     * The default predicate for counter.
+     * @param T type of counter value.
      */
-    template <class T> class counter {
+    template <class T> struct is_counter_zero {
+        /**
+         * Tests if the counter is zero.
+         * @param value current value.
+         * @return true if zero, false otherwise.
+         */
+        bool operator ()(T value) const {
+            return value == (T)0;
+        }
+    };
+
+
+    /**
+     * Predicate that tests if a counter equals a specific value.
+     * @param T type of counter value.
+     */
+    template <class T> struct is_counter_equal_to {
+        const T value;
+
+        /**
+         * Constructor.
+         * @param v value to compare to counter.
+         */
+        is_counter_equal_to(T v) : value(v) {
+        }
+
+        /**
+         * Tests if the counter equals a specific value.
+         * @param value current value.
+         * @return true if equals a value, false otherwise.
+         */
+        bool operator ()(T value) const {
+            return value == this.value;
+        }
+    };
+
+
+    /**
+     * A synchronized counter class.
+     * It can be used to implement waiting for tasks when the counter reaches a specific value.
+     * @param T type of counter value.
+     * @param P type of predicate to use for testing if an event should be reported.
+     */
+    template <class T, class P = is_counter_zero<T>> class counter {
     public:
         /**
          * The default constructor.
          * @param initial_value initial value.
          */
-        counter(T&& initial_value = T()) : m_value(std::move(initial_value)) {
+        counter(T&& initial_value = T()) : 
+            m_value(std::move(initial_value))
+        {
+        }
+
+        /**
+         * The constructor from value and predicate.
+         * @param initial_value initial value.
+         * @param pred predicate.
+         */
+        counter(T&& initial_value, P&& pred) :
+            m_value(std::move(initial_value)),
+            m_pred(std::move(pred))
+        {
+        }
+
+        /**
+         * Returns the value.
+         * @return the value.
+         */
+        operator T () const {
+            return m_value;
+        }
+
+        /**
+         * Returns the value.
+         * @return the value.
+         */
+        T get() const {
+            return m_value;
         }
 
         /**
          * Atomically increments the counter.
          */
         void increment() {
-            std::lock_guard lock(m_mutex);
-            ++m_value;
+            m_value.fetch_add((T)1, std::memory_order_release);
         }
 
         /**
          * Atomically decrements the counter.
          */
         void decrement() {
-            std::lock_guard lock(m_mutex);
-            --m_value;
+            m_value.fetch_sub((T)1, std::memory_order_release);
         }
 
         /**
          * Atomically increments the counter.
-         * It notifies one thread.
+         * It notifies one thread if the predicate returns true.
          */
         void increment_and_notify_one() {
-            {
-                std::lock_guard lock(m_mutex);
-                ++m_value;
+            const T new_value = m_value.fetch_add((T)1, std::memory_order_release) + (T)1;
+            if (m_pred(new_value)) {
+                m_cond.notify_one();
             }
-            m_cond.notify_one();
         }
 
         /**
          * Atomically decrements the counter.
-         * It notifies one thread.
+         * It notifies one thread if the predicate returns true.
          */
         void decrement_and_notify_one() {
-            {
-                std::lock_guard lock(m_mutex);
-                --m_value;
+            const T new_value = m_value.fetch_sub((T)1, std::memory_order_release) - (T)1;
+            if (m_pred(new_value)) {
+                m_cond.notify_one();
             }
-            m_cond.notify_one();
         }
 
         /**
          * Atomically increments the counter.
-         * It notifies all threads.
+         * It notifies all threads if the predicate returns true.
          */
         void increment_and_notify_all() {
-            {
-                std::lock_guard lock(m_mutex);
-                ++m_value;
+            const T new_value = m_value.fetch_add((T)1, std::memory_order_release) + (T)1;
+            if (m_pred(new_value)) {
+                m_cond.notify_all();
             }
-            m_cond.notify_all();
         }
 
         /**
@@ -79,37 +147,28 @@ namespace execlib {
          * It notifies all threads.
          */
         void decrement_and_notify_all() {
-            {
-                std::lock_guard lock(m_mutex);
-                --m_value;
+            const T new_value = m_value.fetch_sub((T)1, std::memory_order_release) - (T)1;
+            if (m_pred(new_value)) {
+                m_cond.notify_all();
             }
-            m_cond.notify_all();
         }
 
         /**
-         * Atomically waits for the counter to get to a specific value.
-         * The function blocks as long as the predicate is false.
-         * @param pred predicate; it should be of type bool(T value),
-         *  and it shall return true if the condition is satisfied.
+         * Atomically waits for the counter to get to a specific value,
+         * depending on the predicate.
          */
-        template <class P> void wait(P&& pred) {
-            std::unique_lock lock(m_mutex);
-            while (!pred(m_value)) {
+        void wait() {
+            while (!m_pred(m_value.load(std::memory_order_acquire))) {
+                std::unique_lock lock(m_mutex);
                 m_cond.wait(lock);
             }
         }
 
-        /**
-         * Atomically waits for the value to become zero.
-         */
-        void wait() {
-            return wait([](const T& value) { return value == (T)0;  });
-        }
-
     private:
+        std::atomic<T> m_value;
+        P m_pred;
         std::mutex m_mutex;
         std::condition_variable m_cond;
-        T m_value;
     };
 
 
