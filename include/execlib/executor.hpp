@@ -101,7 +101,7 @@ namespace execlib {
 
         //a specific job
         template <class J> struct job_impl : job_base {
-            const J job;
+            J job;
             job_impl(thread_data* o, J&& j) : job_base(o, sizeof(*this)), job(std::move(j)) {}
             void execute() override final { job(); }
         };
