@@ -38,6 +38,10 @@ Allows the execution of tasks in a worker thread; the number of worker threads a
 
 Allows blocking on a variable until that variable reaches a specific value; useful for counting tasks.
 
+### mutex
+
+A recursive mutex that is also deadlock-safe: locking this mutex will never result in a deadlock.
+
 ## Algorithms
 
 ### The Scheduler
@@ -56,3 +60,6 @@ Each thread has its own memory pool to allocate memory for jobs.
 
 Each thread has its own mutex to protect its resources. There is no lock contention between threads, except when deallocating memory of stolen jobs.
 
+### Mutex Deadlock Avoidance
+
+The `mutex` class avoids deadlocks by unlocking and then relocking all mutexes locked by the current thread that are above it in memory order.
