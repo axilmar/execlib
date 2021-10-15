@@ -4,6 +4,7 @@
 
 #include "execlib/executor.hpp"
 #include "execlib/counter.hpp"
+#include "execlib/mutex.hpp"
 
 
 #endif //EXECLIB_HPP

@@ -86,8 +86,42 @@ static void performance_test() {
 }
 
 
+const size_t MUTEX_TEST_COUNT = 10000;
+using test_mutex = execlib::mutex;
+//using test_mutex = std::mutex;
+test_mutex mutexA;
+test_mutex mutexB;
+
+
+static void thread1_proc() {
+    for (size_t i = 0; i < MUTEX_TEST_COUNT; ++i) {
+        std::lock_guard lockMutexA(mutexA);
+        std::lock_guard lockMutexB(mutexB);
+        std::cout << "thread 1 step: " << i << std::endl;
+    }
+}
+
+
+static void thread2_proc() {
+    for (size_t i = 0; i < MUTEX_TEST_COUNT; ++i) {
+        std::lock_guard lockMutexB(mutexB);
+        std::lock_guard lockMutexA(mutexA);
+        std::cout << "thread 2 step: " << i << std::endl;
+    }
+}
+
+
+static void mutex_test() {
+    std::thread thread1{ thread1_proc };
+    std::thread thread2{ thread2_proc };
+    thread1.join();
+    thread2.join();
+}
+
+
 int main() {
-    performance_test();
+    //performance_test();
+    mutex_test();
     system("pause");
     return 0;
 }
