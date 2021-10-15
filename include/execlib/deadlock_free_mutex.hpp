@@ -1,5 +1,5 @@
-#ifndef EXECLIB_MUTEX_HPP
-#define EXECLIB_MUTEX_HPP
+#ifndef EXECLIB_DEADLOCK_FREE_MUTEX_HPP
+#define EXECLIB_DEADLOCK_FREE_MUTEX_HPP
 
 
 #include <mutex>
@@ -9,13 +9,13 @@ namespace execlib {
 
 
     /**
-     * A deadlock avoiding mutex.
+     * A deadlock-free mutex.
      * 
      * It achieves deadlock avoidance by unlocking and then relocking all mutexes
      * locked by this thread and that are above this, in memory order.
      * 
      */
-    class mutex {
+    class deadlock_free_mutex {
     public:
         /**
          * Tries to lock the mutex.
@@ -41,4 +41,4 @@ namespace execlib {
 } //namespace execlib
 
 
-#endif //EXECLIB_MUTEX_HPP
+#endif //EXECLIB_DEADLOCK_FREE_MUTEX_HPP

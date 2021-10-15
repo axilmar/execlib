@@ -87,7 +87,7 @@ static void performance_test() {
 
 
 const size_t MUTEX_TEST_COUNT = 10000;
-using test_mutex = execlib::mutex;
+using test_mutex = execlib::deadlock_free_mutex;
 //using test_mutex = std::mutex;
 test_mutex mutexA;
 test_mutex mutexB;
