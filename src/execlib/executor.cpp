@@ -153,14 +153,16 @@ namespace execlib {
         std::scoped_lock lock(dst.mutex, src.mutex);
 
         //if the source thread has very few jobs, do nothing
-        if (src.jobs.size() < 8) {
+        if (src.jobs.size() < 4) {
             return false;
         }
 
-        const auto start = src.jobs.begin() + src.jobs.size() / 2;
-        const auto end = src.jobs.end();
+        //the set of jobs to get is the oldest half,
+        //which has priority for execution
+        const auto start = src.jobs.begin();
+        const auto end = src.jobs.begin() + src.jobs.size() / 2;
 
-        //copy the newsest half of jobs to destination
+        //copy half of jobs to destination
         dst.jobs.insert(dst.jobs.end(), start, end);
 
         //remove jobs from source
