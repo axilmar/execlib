@@ -30,16 +30,45 @@ namespace execlib {
 
     //try to lock the mutex
     bool deadlock_free_mutex::try_lock() {
+        auto& lmt = get_locked_mutex_table();
+
         //if the mutex is successfully locked,
         //insert the mutex in the thread's locked mutex table
         //and return success
         if (m_mutex.try_lock()) {
-            get_locked_mutex_table().insert(this);
+            lmt.insert(this);
             return true;
         }
 
-        //failed to lock the mutex
-        return false;
+        //failed to lock the mutex; perhaps there is a deadlock?
+        //unlock all mutexes above this and relock them
+
+        //insert the mutex into the locked mutex table in order to find
+        //all the mutexes above this mutex
+        const auto it = lmt.insert(this);
+
+        //unlock all mutexes above this
+        for (auto it1 = std::next(it); it1 != lmt.end(); ++it1) {
+            (*it1)->m_mutex.unlock();
+        }
+
+        //try relocking the mutex; if it fails, then relock all mutexes above this
+        //and remove this mutex from the locked mutex table
+        if (!m_mutex.try_lock()) {
+            for (auto it1 = std::next(it); it1 != lmt.end(); ++it1) {
+                (*it1)->m_mutex.lock();
+            }
+            lmt.erase(it);
+            return false;
+        }
+
+        //lock all mutexes above this
+        for (auto it1 = std::next(it); it1 != lmt.end(); ++it1) {
+            (*it1)->m_mutex.lock();
+        }
+
+        //success
+        return true;
     }
 
 
@@ -55,9 +84,9 @@ namespace execlib {
             return;
         }
 
-        //the mutex could not be locked, maybe due to deadlock;
-        //unlock and relock all mutexes above this in memory order
-       
+        //failed to lock the mutex; perhaps there is a deadlock?
+        //unlock all mutexes above this and relock them
+
         //insert the mutex into the locked mutex table in order to find
         //all the mutexes above this mutex
         const auto it = lmt.insert(this);
