@@ -1,4 +1,5 @@
 #include "execlib/executor_internals.hpp"
+#include "executor_internals_private.hpp"
 
 
 namespace execlib {

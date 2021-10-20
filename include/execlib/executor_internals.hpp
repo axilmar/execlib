@@ -2,8 +2,7 @@
 #define EXECLIB_EXECUTOR_INTERNALS_HPP
 
 
-#include <mutex>
-#include <memory_resource>
+#include <utility>
 
 
 namespace execlib {
@@ -16,13 +15,7 @@ namespace execlib {
     class executor_internals {
     private:
         //queue base
-        struct queue_base {
-            //mutex of queue.
-            std::mutex m_mutex;
-
-            //memory pool for queue
-            std::pmr::unsynchronized_pool_resource m_memory_pool;
-        };
+        struct queue_base;
 
         //interface for jobs.
         class job {

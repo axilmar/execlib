@@ -59,7 +59,7 @@ namespace execlib {
                 void* mem = alloc_memory_for_job(q, sizeof(job_type));
 
                 //init job
-                job* j = new (mem) job_type(get_queue_base(q), std::forward<F>(func));
+                job* j = new (mem) job_type(reinterpret_cast<queue_base*>(q), std::forward<F>(func));
 
                 //put the job in the queue
                 put_job(q, j);
@@ -120,9 +120,6 @@ namespace execlib {
 
         //get mutex of queue
         static std::mutex& get_mutex(queue* q);
-
-        //get queue base
-        static queue_base* get_queue_base(queue* q);
 
         //allocate memory from queue
         static void* alloc_memory_for_job(queue* q, size_t size);

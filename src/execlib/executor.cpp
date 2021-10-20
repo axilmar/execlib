@@ -3,6 +3,7 @@
 #include <deque>
 #include <condition_variable>
 #include "execlib/executor.hpp"
+#include "executor_internals_private.hpp"
 
 
 namespace execlib {
@@ -326,12 +327,6 @@ namespace execlib {
     //get mutex of queue
     std::mutex& executor::get_mutex(queue* q) {
         return q->get_mutex();
-    }
-
-
-    //get queue base
-    executor_internals::queue_base* executor::get_queue_base(queue* q) {
-        return q;
     }
 
 
