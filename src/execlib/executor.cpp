@@ -38,15 +38,11 @@ namespace execlib {
 
         //allocate memory for job; 
         //unsynchronized because it is invoked from executor::execute
-        //which locks the queue's mutex separately
+        //which locks the queue's mutex separately;
+        //there is no corresponding free_memory_for_job function
+        //because the memory is freed from job::delete_this.
         void* alloc_memory_for_job(size_t size) {
             return m_memory_pool.allocate(size);
-        }
-
-        //free memory for job; synchronized
-        void free_memory_for_job(void* p, size_t size) {
-            std::lock_guard lock(m_mutex);
-            m_memory_pool.deallocate(p, size);
         }
 
         //check if empty
