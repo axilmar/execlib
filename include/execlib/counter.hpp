@@ -98,15 +98,47 @@ namespace execlib {
         /**
          * Atomically increments the counter.
          */
-        void increment() {
-            m_value.fetch_add((T)1, std::memory_order_release);
+        void increment(const T& value = (T)1) {
+            m_value.fetch_add(value, std::memory_order_release);
         }
 
         /**
          * Atomically decrements the counter.
          */
-        void decrement() {
-            m_value.fetch_sub((T)1, std::memory_order_release);
+        void decrement(const T& value = (T)1) {
+            m_value.fetch_sub(value, std::memory_order_release);
+        }
+
+        /**
+         * Atomically increments the counter.
+         */
+        counter& operator ++ () {
+            increment();
+            return *this;
+        }
+
+        /**
+         * Atomically decrements the counter.
+         */
+        counter& operator -- () {
+            decrement();
+            return *this;
+        }
+
+        /**
+         * Atomically adds a value to the counter.
+         */
+        counter& operator += (const T& value) {
+            increment(value);
+            return *this;
+        }
+
+        /**
+         * Atomically subtracts  value from the counter.
+         */
+        counter& operator -= (const T& value) {
+            decrement(value);
+            return *this;
         }
 
         /**

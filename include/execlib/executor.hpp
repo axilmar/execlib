@@ -3,12 +3,10 @@
 
 
 #include <thread>
-#include <deque>
-#include <mutex>
-#include <condition_variable>
-#include <memory_resource>
 #include <atomic>
+#include <mutex>
 #include <vector>
+#include "executor_internals.hpp"
 
 
 namespace execlib {
@@ -18,7 +16,7 @@ namespace execlib {
      * Contains the mechanism for executing jobs in different threads.
      * It uses job stealing in order to avoid thread starving.
      */
-    class executor {
+    class executor : private executor_internals {
     public:
         /**
          * The constructor.
@@ -27,132 +25,113 @@ namespace execlib {
          */
         executor(size_t thread_count = std::thread::hardware_concurrency());
 
-        executor(const executor&) = delete;
-        executor(executor&&) = delete;
-
         /**
          * Signals all threads to stop execution, then waits for them to stop.
          * Remaining jobs are not executed.
          */
         ~executor();
 
-        executor& operator = (const executor&) = delete;
-        executor& operator = (executor&&) = delete;
-
         /**
          * Returns number of threads.
          * @return number of threads.
          */
-        size_t thread_count() const { return m_threads.size(); }
+        size_t thread_count() const { return m_queues.size(); }
 
         /**
          * Executes the given job.
          * The target thread is chosen in a round-robin fashion.
          * Memory for the job is allocated in the context of the target thread.
          */
-        template <class J> void execute(J&& job) {
-            using job_type = job_impl<J>;
+        template <class F> void execute(F&& func) {
+            using job_type = job_impl<F>;
 
-            //get next index
-            const size_t next_index = m_next_index.fetch_add(1, std::memory_order_release) % m_threads.size();
+            //next queue index, in round robin fashion
+            const size_t queue_index = m_next_queue_index.fetch_add(1, std::memory_order_release) % m_queues.size();
 
-            thread_data& td = m_threads[next_index];
+            //the queue to put the job to
+            queue* q = m_queues[queue_index];
 
-            //add job to queue
+            //allocate/init job/put job in queue, synchronized
             {
-                //synchronized operation
-                std::lock_guard lock(td.mutex);
+                std::lock_guard lock_queue(get_mutex(q));
 
-                //allocate memory
-                void* mem = td.memory_pool.allocate(sizeof(job_type));
+                //allocate memory for job; each queue has its own memory pool
+                void* mem = alloc_memory(q, sizeof(job_type));
 
-                //init the job
-                job_type *j = new (mem) job_type(&td, std::move(job));
+                //init job
+                job* j = new (mem) job_type(std::forward<F>(func));
 
-                //add the job to the queue
-                td.jobs.push_back(job_pointer(j));
+                //put the job in the queue
+                put_job(q, j);
             }
 
-            //notify the waiting thread
-            td.cond.notify_one();
+            //notify the queue listener
+            notify_listener(q);
         }
 
+        /**
+         * Removes the current worker thread from the executor's active threads
+         * and puts it in a deactivated thread list.
+         * 
+         * The current worker thread is replaced with another worker thread.
+         *
+         * It must be invoked at the beginning of a long-running job.
+         *
+         * This is useful for long-running jobs that may occupy a worker thread
+         * for a long time: it allows the executor to continue executing jobs
+         * on all queues, despite this thread blocking the worker thread.
+         * 
+         * @exception std::logic_error thrown if this is called outside of a worker thread.
+         */
+        static void release_current_worker_thread();
+
+        /**
+         * Returns the current executor.
+         * @return the current executor, or null if this code is not executed by an executor.
+         */
+        static executor* get_current_executor();
+
+        executor(const executor&) = delete;
+        executor(executor&&) = delete;
+        executor& operator = (const executor&) = delete;
+        executor& operator = (executor&&) = delete;
+
     private:
-        //type of used memory pool
-        using memory_pool_type = std::pmr::unsynchronized_pool_resource;
+        //queue defined in implementation file
+        class queue;
 
-        //status
-        enum status {
-            terminated,
-            succeeded,
-            failed
-        };
+        //worker thread defined in implementation file
+        class worker_thread;
 
-        struct thread_data;
+        //queues are used in a round-robin fashion
+        std::atomic<size_t> m_next_queue_index{ 0 };
 
-        //a job
-        struct job_base {
-            thread_data* const owner;
-            const size_t size;
-            job_base(thread_data* o, size_t s) : owner(o), size(s) {}
-            virtual ~job_base() {}
-            virtual void execute() = 0;
-        };
+        //queues
+        std::vector<queue*> m_queues;
 
-        //a specific job
-        template <class J> struct job_impl : job_base {
-            J job;
-            job_impl(thread_data* o, J&& j) : job_base(o, sizeof(*this)), job(std::move(j)) {}
-            void execute() override final { job(); }
-        };
+        //worker thread mutex
+        std::mutex m_worker_thread_mutex;
 
-        //job pointer
-        using job_pointer = job_base*;
+        //all worker threads
+        std::vector<worker_thread*> m_worker_threads;
 
-        //thread data
-        struct thread_data {
-            //mutex that protects the thread data
-            std::mutex mutex;
+        //released worker threads
+        std::vector<worker_thread*> m_released_worker_threads;
 
-            //memory pool
-            memory_pool_type memory_pool;
+        //get mutex of queue
+        static std::mutex& get_mutex(queue* q);
 
-            //condition variable for the waiting on the queue
-            std::condition_variable cond;
+        //allocate memory from queue
+        static void* alloc_memory(queue* q, size_t size);
 
-            //queue of jobs
-            std::deque<job_pointer> jobs;
+        //put job in queue
+        static void put_job(queue* q, job* j);
 
-            //actual thread
-            std::thread thread;
-        };
+        //notifies the queue listener that a new job is available
+        static void notify_listener(queue* q);
 
-        //next available thread
-        std::atomic<std::size_t> m_next_index;
-
-        //threads
-        std::vector<thread_data> m_threads;
-
-        //stop flag
-        std::atomic<bool> m_stop{ false };
-
-        //runs thread on specific thread data
-        void run(size_t thread_index);
-
-        //executes next jobs
-        status execute_jobs(thread_data& td);
-
-        //steal jobs from other threads
-        bool steal_jobs(size_t thread_index);
-
-        //steal jobs from other thread
-        bool steal_jobs(thread_data& dst, thread_data& src);
-
-        //executes a job
-        static void execute_job(job_base* job);
-
-        //deletes a job
-        static void delete_job(job_base* job);
+        friend class _executor;
+        friend class worker_thread;
     };
 
 
