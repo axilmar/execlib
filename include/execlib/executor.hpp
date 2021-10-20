@@ -51,15 +51,15 @@ namespace execlib {
             //the queue to put the job to
             queue* q = m_queues[queue_index];
 
-            //allocate/init job/put job in queue, synchronized
+            //allocate/init job/put job in queue, synchronized on queue
             {
                 std::lock_guard lock_queue(get_mutex(q));
 
                 //allocate memory for job; each queue has its own memory pool
-                void* mem = alloc_memory(q, sizeof(job_type));
+                void* mem = alloc_memory_for_job(q, sizeof(job_type));
 
                 //init job
-                job* j = new (mem) job_type(std::forward<F>(func));
+                job* j = new (mem) job_type(get_queue_base(q), std::forward<F>(func));
 
                 //put the job in the queue
                 put_job(q, j);
@@ -121,8 +121,11 @@ namespace execlib {
         //get mutex of queue
         static std::mutex& get_mutex(queue* q);
 
+        //get queue base
+        static queue_base* get_queue_base(queue* q);
+
         //allocate memory from queue
-        static void* alloc_memory(queue* q, size_t size);
+        static void* alloc_memory_for_job(queue* q, size_t size);
 
         //put job in queue
         static void put_job(queue* q, job* j);

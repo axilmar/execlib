@@ -129,10 +129,10 @@ static void release_worker_thread_test() {
     execlib::counter counter(2);
 
     executor.execute([&]() {
-        //execlib::executor::release_current_worker_thread();
+        execlib::executor::release_current_worker_thread();
         printf("1st job started\n");
         size_t sum = 0;
-        for (size_t i = 0; i < 10000; ++i) {
+        for (size_t i = 0; i < 1000; ++i) {
             printf("added %zi\n", i);
             sum += i;
         }
@@ -152,9 +152,9 @@ static void release_worker_thread_test() {
 
 
 int main() {
-    //performance_test();
-    //mutex_test();
-    //release_worker_thread_test();
+    performance_test();
+    release_worker_thread_test();
+    mutex_test();
     system("pause");
     return 0;
 }

@@ -23,7 +23,7 @@ namespace execlib {
 
 
     //queue definition
-    class executor::queue {
+    class executor::queue : private executor_internals::queue_base {
     public:
         //constructor.
         queue(size_t index) 
@@ -35,13 +35,16 @@ namespace execlib {
         //returns the queue's mutex
         std::mutex& get_mutex() { return m_mutex; }
 
-        //allocate memory
-        void* alloc_memory(size_t size) {
+        //allocate memory for job; 
+        //unsynchronized because it is invoked from executor::execute
+        //which locks the queue's mutex separately
+        void* alloc_memory_for_job(size_t size) {
             return m_memory_pool.allocate(size);
         }
 
-        //free memory
-        void free_memory(void* p, size_t size) {
+        //free memory for job; synchronized
+        void free_memory_for_job(void* p, size_t size) {
+            std::lock_guard lock(m_mutex);
             m_memory_pool.deallocate(p, size);
         }
 
@@ -67,24 +70,12 @@ namespace execlib {
             m_cond.notify_one();
         }
 
-        //delete job
-        void delete_job(job* j) {
-            const size_t size = j->get_size();
-            j->~job();
-            free_memory(j, size);
-        }
-
     private:
         //queue index
         const size_t m_index;
 
-        //mutex that protects the queue
-        std::mutex m_mutex;
-
-        //memory pool; local to queue to avoid possible global lock contention from c++ memory allocation
-        std::pmr::unsynchronized_pool_resource m_memory_pool;
-
-        //jobs
+        //jobs; uses the unsynchronized memory pool 
+        //because synchronization is done on the queue's mutex
         std::deque<job*, std::pmr::polymorphic_allocator<job*>> m_jobs;
 
         //for thread notifications
@@ -189,6 +180,8 @@ namespace execlib {
                 //if it has queue, then wait on jobs from queue
                 if (q) {
                     job* j;
+
+                    //synchronized on queue
                     {
                         std::unique_lock lock_queue(q->m_mutex);
 
@@ -222,10 +215,10 @@ namespace execlib {
                         j->invoke();
                     }
                     catch (...) {
-                        q->delete_job(j);
+                        j->delete_this();
                         throw;
                     }
-                    q->delete_job(j);
+                    j->delete_this();
 
                     //continue loop
                     continue;
@@ -336,9 +329,15 @@ namespace execlib {
     }
 
 
+    //get queue base
+    executor_internals::queue_base* executor::get_queue_base(queue* q) {
+        return q;
+    }
+
+
     //allocate memory from queue
-    void* executor::alloc_memory(queue* q, size_t size) {
-        return q->alloc_memory(size);
+    void* executor::alloc_memory_for_job(queue* q, size_t size) {
+        return q->alloc_memory_for_job(size);
     }
 
 
