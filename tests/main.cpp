@@ -114,7 +114,7 @@ static void thread2_proc(const size_t test_count, test_mutex& mutexA, test_mutex
 
 
 static void mutex_test() {
-    const size_t MUTEX_TEST_COUNT = 10000;
+    const size_t MUTEX_TEST_COUNT = 1000;
     test_mutex mutexA;
     test_mutex mutexB;
     std::thread thread1{ thread1_proc, MUTEX_TEST_COUNT, std::ref(mutexA), std::ref(mutexB) };
