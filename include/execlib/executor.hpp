@@ -104,7 +104,7 @@ namespace execlib {
         class worker_thread;
 
         //queues are used in a round-robin fashion
-        std::atomic<size_t> m_next_queue_index{ 0 };
+        std::atomic<size_t> m_next_queue_index{};
 
         //queues
         std::vector<queue*> m_queues;
