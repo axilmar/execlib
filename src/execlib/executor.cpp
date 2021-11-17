@@ -128,8 +128,14 @@ namespace execlib {
 
         //steal jobs from queue
         bool steal_jobs(queue* dst, queue* src) {
-            //lock the source queue
-            std::lock_guard lock(src->m_mutex);
+            //lock the queues
+            std::scoped_lock lock(src->m_mutex, dst->m_mutex);
+
+            //if the destination got some data while in the stealing phase, 
+            //return true to allow it to process that data
+            if (!dst->empty()) {
+                return true;
+            }
 
             //the source queue must have at least 2 jobs
             if (src->m_jobs.size() < 2) {
@@ -184,7 +190,9 @@ namespace execlib {
 
                         //if no jobs, steal jobs from other queues
                         if (q->m_jobs.empty()) {
+                            lock_queue.unlock();
                             steal_jobs(q);
+                            lock_queue.lock();
                         }
 
                         //wait while the queue is empty
@@ -259,6 +267,7 @@ namespace execlib {
             m_worker_threads.push_back(wt);
         }
     }
+
 
     //Signals all threads to stop execution, then waits for them to stop.
     executor::~executor() {
